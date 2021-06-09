@@ -1,8 +1,40 @@
-import Head from 'next/head'
-import Image from 'next/image'
-import styles from '../styles/Home.module.css'
+import { useState } from "react";
+import Head from "next/head";
+import styles from "../styles/Home.module.css";
 
 export default function Home() {
+  const [user, setUser] = useState(null);
+  const [error, setError] = useState(null);
+
+  const refreshToken = () => {
+    const refreshToken = localStorage.getItem("refresh_token");
+    return fetch(`/api/token?refresh_token=${refreshToken}`)
+      .then((res) => res.json())
+      .then((data) => {
+        localStorage.setItem("access_token", data.access_token);
+        localStorage.setItem("refresh_token", data.refresh_token);
+      })
+      .catch((err) => setError(err));
+  };
+
+  const fetchUser = () => {
+    const token = localStorage.getItem("access_token");
+    return fetch("https://api.twitch.tv/helix/users", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Client-Id": process.env.CLIENT_ID,
+      },
+    })
+      .then((res) => {
+        if (res.status === 401) {
+          return refreshToken();
+        }
+        return res.json();
+      })
+      .then((d) => setUser(d.data[0]))
+      .catch((err) => setError(err));
+  };
+
   return (
     <div className={styles.container}>
       <Head>
@@ -12,58 +44,19 @@ export default function Home() {
       </Head>
 
       <main className={styles.main}>
-        <h1 className={styles.title}>
-          Welcome to <a href="https://nextjs.org">Next.js!</a>
-        </h1>
+        <h1 className={styles.title}>Welcome to Next.js!</h1>
 
-        <p className={styles.description}>
-          Get started by editing{' '}
-          <code className={styles.code}>pages/index.js</code>
-        </p>
-
-        <div className={styles.grid}>
-          <a href="https://nextjs.org/docs" className={styles.card}>
-            <h2>Documentation &rarr;</h2>
-            <p>Find in-depth information about Next.js features and API.</p>
-          </a>
-
-          <a href="https://nextjs.org/learn" className={styles.card}>
-            <h2>Learn &rarr;</h2>
-            <p>Learn about Next.js in an interactive course with quizzes!</p>
-          </a>
-
-          <a
-            href="https://github.com/vercel/next.js/tree/master/examples"
-            className={styles.card}
-          >
-            <h2>Examples &rarr;</h2>
-            <p>Discover and deploy boilerplate example Next.js projects.</p>
-          </a>
-
-          <a
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className={styles.card}
-          >
-            <h2>Deploy &rarr;</h2>
-            <p>
-              Instantly deploy your Next.js site to a public URL with Vercel.
-            </p>
-          </a>
-        </div>
-      </main>
-
-      <footer className={styles.footer}>
         <a
-          href="https://vercel.com?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+          href={`https://id.twitch.tv/oauth2/authorize?client_id=${process.env.CLIENT_ID}&response_type=code&scope=user:read:email&redirect_uri=${process.env.REDIRECT_URI}`}
         >
-          Powered by{' '}
-          <span className={styles.logo}>
-            <Image src="/vercel.svg" alt="Vercel Logo" width={72} height={16} />
-          </span>
+          Connect to Twitch
         </a>
-      </footer>
+
+        <button onClick={fetchUser}>Fetch User</button>
+
+        {user && !error && <p>{user.login}</p>}
+        {error && <p>{error}</p>}
+      </main>
     </div>
-  )
+  );
 }
